@@ -24,7 +24,7 @@ class PredictionRejectionArea(UEMetric):
             return "prr"
         return f"prr_{self.max_rejection}"
 
-    def __call__(self, estimator: List[float], target: List[float]) -> float:
+    def __call__(self, estimator: List[float], target: List[float], return_scores:bool = False) -> float:
         """
         Measures the area under the Prediction-Rejection curve between `estimator` and `target`.
 
@@ -33,6 +33,7 @@ class PredictionRejectionArea(UEMetric):
                 Higher values indicate more uncertainty.
             target (List[int]): a batch of ground-truth uncertainty estimations.
                 Higher values indicate less uncertainty.
+            return_scores(bool): a marker for returning PRR scores.
         Returns:
             float: area under the Prediction-Rejection curve.
                 Higher values indicate better uncertainty estimations.
@@ -50,4 +51,9 @@ class PredictionRejectionArea(UEMetric):
         cumsum = np.cumsum(sorted_metrics)[-num_rej:]
         scores = (cumsum / np.arange((num_obs - num_rej) + 1, num_obs + 1))[::-1]
         prr_score = np.sum(scores) / num_rej
+
+
+        if return_scores:
+            return prr_score, scores
+
         return prr_score
