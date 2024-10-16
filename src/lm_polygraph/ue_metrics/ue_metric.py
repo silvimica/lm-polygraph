@@ -66,7 +66,7 @@ def get_random_scores(function, metrics, return_scores:bool = False, num_iter=10
    
     rand_scores = np.arange(len(metrics))
 
-    prr_values = []      # To store PRR scores across iterations
+    ue_metric_scores = []      # To store PRR scores across iterations
     score_values = []    # To store detailed scores or rejection accuracies across iterations
 
     for _ in range(num_iter):
@@ -76,23 +76,23 @@ def get_random_scores(function, metrics, return_scores:bool = False, num_iter=10
         if return_scores:
             # Call the function to get both PRR score and detailed scores
             prr_score, detailed_scores = function(rand_scores, metrics, return_scores=True)
-            prr_values.append(prr_score)
+            ue_metric_scores.append(prr_score)
             score_values.append(detailed_scores)
         else:
             # Call the function to get only the PRR score
             prr_score = function(rand_scores, metrics)
-            prr_values.append(prr_score)
+            ue_metric_scores.append(prr_score)
 
     # Compute the mean PRR score across all iterations
-    mean_prr_score = np.mean(prr_values)
+    ue_metric_score = np.mean(ue_metric_scores)
 
     # If return_scores is True, also compute the mean of the detailed scores (or rejection accuracies)
     if return_scores:
         mean_scores = np.mean(score_values, axis=0)
-        return mean_prr_score, mean_scores
+        return ue_metric_score, mean_scores
 
     # Otherwise, just return the PRR score (no detailed scores)
-    return mean_prr_score
+    return ue_metric_score
 
 
 

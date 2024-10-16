@@ -278,7 +278,6 @@ class UEManager:
             deberta_device (Optional[str]): The device to run deberta on. If None, will use 'cuda:0' if available,
                 'cpu' otherwise. Default: None.
             language (str): Language to test in claim-level benchmark, one of 'en', 'zh', 'ar', 'ru'. Default: 'en'.
-            verbose for (e_level, e_name), estimator_values in self.estimations.items():
             for (gen_level, gen_name), generation_metric in self.gen_metrics.items():
                 for ue_metric in self.ue_metrics:
                     if gen_level != e_level:
@@ -421,7 +420,6 @@ class UEManager:
         ensemble_stats = [
             s
             for e in self.ensemble_estimators
-            for s in e.stats_dependenciesgenerate_prr_curve
             if s.startswith("ensemble")
         ]
         ensemble_stats, _ = _order_calculators(

@@ -23,7 +23,6 @@ class PredictionRejectionArea(UEMetric):
         if self.max_rejection == 1:
             return "prr"
         return f"prr_{self.max_rejection}"
-        return "prr"
 
     def __call__(self, estimator: List[float], target: List[float], return_scores:bool = False) -> float:
         """
