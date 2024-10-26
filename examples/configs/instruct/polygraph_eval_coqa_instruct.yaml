@@ -1,0 +1,21 @@
+defaults:
+  - polygraph_eval_coqa_default_instruct
+  - top1_processing
+  - _self_
+
+experiment_name: coqa_empirical_baselines
+
+description: "Here's a short story:\n\n{story} (End of story)\n\nAnswer the following question"
+few_shot_prompt: "Question: {question}\nGuess: {answer}"
+prompt: "Question: {question}\n"
+max_new_tokens: 10000
+
+use_tok_ue: true
+include_whitebox_ue: true
+additional_estimators: 
+  - module: lm_polygraph.estimators.token_sar
+    class_name: TokenSAR
+    kwargs: {}
+  - module: lm_polygraph.estimators.perplexity
+    class_name: Perplexity
+    kwargs: {}

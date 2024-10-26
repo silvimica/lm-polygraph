@@ -1,0 +1,21 @@
+defaults:
+  - polygraph_eval_mmlu_default_instruct
+  - top1_processing
+  - _self_
+
+experiment_name: mmlu_empirical_baselines
+
+description: "Provide your best guess for the following question about {subject} selecting one of the options."
+few_shot_prompt: "Q:{question}\nA. {choices[0]}\nB. {choices[1]}\nC. {choices[2]}\nD. {choices[3]}\nGuess:{answer}"
+prompt: "Q:{question}\nA. {choices[0]}\nB. {choices[1]}\nC. {choices[2]}\nD. {choices[3]}\n"
+max_new_tokens: 10000
+
+use_tok_ue: true
+include_whitebox_ue: true
+additional_estimators: 
+  - module: lm_polygraph.estimators.token_sar
+    class_name: TokenSAR
+    kwargs: {}
+  - module: lm_polygraph.estimators.perplexity
+    class_name: Perplexity
+    kwargs: {}
