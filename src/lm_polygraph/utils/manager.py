@@ -469,9 +469,14 @@ class UEManager:
 
             batch_gen_metrics: Dict[Tuple[str, str], List[float]] = defaultdict(list)
             for generation_metric in self.generation_metrics:
-                m = generation_metric(
-                    batch_stats, target_texts=target_texts, target_tokens=target_tokens
-                )
+                try:
+                    m = generation_metric(
+                        batch_stats, target_texts=target_texts, target_tokens=target_tokens
+                    )
+                except Exception as ex:
+                    m = generation_metric(
+                        batch_stats, target_texts=target_texts
+                    )
                 if not isinstance(m, list):
                     m = m.tolist()
                 if generation_metric.level == "claim":
