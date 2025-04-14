@@ -1,6 +1,5 @@
 import re
 import numpy as np
-from evaluate import load
 
 from typing import List, Dict
 from .generation_metric import GenerationMetric
@@ -12,14 +11,29 @@ class Comet(GenerationMetric):
     between model-generated texts and ground truth texts.
     """
 
-    def __init__(self, source_ignore_regex=None, lang="en"):
-        super().__init__(["greedy_texts", "input_texts"], "sequence")
-        self.scorer = load("comet")
+    def __init__(self, scorer, source_ignore_regex=None, lang="en", sample: bool = False, sample_strategy: str = "First"):
+        if sample:
+            super().__init__([
+                "first_sample_texts",
+                "best_sample_texts",
+                "best_normalized_sample_texts",
+                "input_texts"],
+            "sequence")
+        else:
+            super().__init__(["greedy_texts", "input_texts"], "sequence")
+        self.sample = sample
+        self.sample_strategy = sample_strategy
         self.source_ignore_regex = (
             re.compile(source_ignore_regex) if source_ignore_regex else None
         )
+        self.scorer = scorer
 
     def __str__(self):
+        if self.sample:
+            if self.sample_strategy == "First":
+                return f"SampleComet"
+            else:
+                return f"{self.sample_strategy}SampleComet"
         return "Comet"
 
     def _filter_text(self, text: str, ignore_regex: re.Pattern) -> str:
@@ -54,9 +68,22 @@ class Comet(GenerationMetric):
             self._filter_text(src, self.source_ignore_regex)
             for src in stats["input_texts"]
         ]
+
+        if self.sample:
+            if self.sample_strategy == "First":
+                gen_texts = stats["first_sample_texts"]
+            elif self.sample_strategy == "Best":
+                gen_texts = stats["best_sample_texts"]
+            elif self.sample_strategy == "BestNormalized":
+                gen_texts = stats["best_normalized_sample_texts"]
+            else:
+                raise ValueError(f"Invalid sample strategy: {self.sample_strategy}")
+        else:
+            gen_texts = stats["greedy_texts"]
+
         scores = np.array(
             self.scorer.compute(
-                predictions=stats["greedy_texts"],
+                predictions=gen_texts,
                 references=target_texts,
                 sources=sources,
             )["scores"]

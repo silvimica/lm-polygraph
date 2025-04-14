@@ -16,9 +16,19 @@ class AccuracyMetric(GenerationMetric):
     """
 
     def __init__(
-        self, target_ignore_regex=None, output_ignore_regex=None, normalize=False
+        self, target_ignore_regex=None, output_ignore_regex=None, normalize=False, sample: bool = False, sample_strategy: str = "First"
     ):
-        super().__init__(["greedy_texts"], "sequence")
+        if sample:
+            super().__init__([
+                "first_sample_texts",
+                "best_sample_texts",
+                "best_normalized_sample_texts",
+                "input_texts"],
+            "sequence")
+        else:
+            super().__init__(["greedy_texts"], "sequence")
+        self.sample = sample
+        self.sample_strategy = sample_strategy
         self.target_ignore_regex = (
             re.compile(target_ignore_regex) if target_ignore_regex else None
         )
@@ -33,6 +43,11 @@ class AccuracyMetric(GenerationMetric):
             )
 
     def __str__(self):
+        if self.sample:
+            if self.sample_strategy == "First":
+                return "SampleAccuracy"
+            else:
+                return f"{self.sample_strategy}SampleAccuracy"
         return "Accuracy"
 
     def _score_single(self, output: str, target: str) -> int:
@@ -66,11 +81,21 @@ class AccuracyMetric(GenerationMetric):
         Returns:
             np.ndarray: list of accuracies: 1 if generated text is equal to ground-truth and 0 otherwise.
         """
-        greedy_texts = stats["greedy_texts"]
+        if self.sample:
+            if self.sample_strategy == "First":
+                gen_texts = stats["first_sample_texts"]
+            elif self.sample_strategy == "Best":
+                gen_texts = stats["best_sample_texts"]
+            elif self.sample_strategy == "BestNormalized":
+                gen_texts = stats["best_normalized_sample_texts"]
+            else:
+                raise ValueError(f"Invalid sample strategy: {self.sample_strategy}")
+        else:
+            gen_texts = stats["greedy_texts"]
 
         result = []
 
-        for hyp, ref in zip(greedy_texts, target_texts):
+        for hyp, ref in zip(gen_texts, target_texts):
             ref = self._filter_text(ref, self.target_ignore_regex)
             hyp = self._filter_text(hyp, self.output_ignore_regex)
 

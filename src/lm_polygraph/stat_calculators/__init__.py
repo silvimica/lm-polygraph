@@ -9,7 +9,9 @@ from .claim_level_prompts import (
     OPENAI_FACT_CHECK_PROMPTS,
 )
 from .entropy import EntropyCalculator
-from .sample import SamplingGenerationCalculator, BlackboxSamplingGenerationCalculator
+from .entropy import SampleEntropyCalculator
+from .sample import SamplingGenerationCalculator, BlackboxSamplingGenerationCalculator, FirstSampleCalculator, BestSampleCalculator
+from .sample_alternatives_nli import SampleAlternativesNLICalculator
 from .greedy_alternatives_nli import (
     GreedyAlternativesNLICalculator,
     GreedyAlternativesFactPrefNLICalculator,
@@ -18,7 +20,13 @@ from .bart_score import BartScoreCalculator
 from .model_score import ModelScoreCalculator
 from .embeddings import EmbeddingsCalculator
 from .ensemble_token_data import EnsembleTokenLevelDataCalculator
-from .semantic_matrix import SemanticMatrixCalculator
+from .semantic_matrix import SemanticMatrixCalculator, ConcatSemanticMatrixCalculator
 from .cross_encoder_similarity import CrossEncoderSimilarityMatrixCalculator
 from .extract_claims import ClaimsExtractor
 from .semantic_classes import SemanticClassesCalculator
+from .greedy_similarity import GreedySimilarityCalculator
+from .greedy_semantic_matrix import GreedySemanticMatrixCalculator, ConcatGreedySemanticMatrixCalculator
+from .rouge_matrix import RougeLSemanticMatrixCalculator
+from .greedy_rouge_matrix import GreedyRougeLSemanticMatrixCalculator
+from .align_matrix import AlignMatrixCalculator
+from .greedy_align_matrix import GreedyAlignMatrixCalculator

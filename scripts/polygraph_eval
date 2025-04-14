@@ -13,10 +13,12 @@ import logging
 
 log = logging.getLogger('lm_polygraph')
 
+from evaluate import load
 from lm_polygraph.utils.manager import UEManager
 from lm_polygraph.utils.dataset import Dataset
 from lm_polygraph.utils.model import WhiteboxModel, BlackboxModel, create_ensemble
 from lm_polygraph.utils.processor import Logger
+from lm_polygraph.generation_metrics.alignscore_utils import AlignScorer
 from lm_polygraph.generation_metrics import *
 from lm_polygraph.estimators import *
 from lm_polygraph.utils.openai_chat import OpenAIChat
@@ -26,6 +28,8 @@ from lm_polygraph.estimators.ensemble_token_measures import *
 from lm_polygraph.ue_metrics import *
 from lm_polygraph.utils.common import load_external_module
 from lm_polygraph.utils.generation_parameters import GenerationParameters
+from lm_polygraph.generation_metrics.x_metric_utils import MT5ForRegression
+from transformers import AutoTokenizer, AutoModelForCausalLM
 
 hydra_config = Path(os.environ["HYDRA_CONFIG"])
 
@@ -183,37 +187,60 @@ def main(args):
         generation_metrics = get_generation_metrics(args)
 
         ue_metrics = get_ue_metrics(args)
-
-        man = UEManager(
-            dataset,
-            model,
-            estimators,
-            generation_metrics,
-            ue_metrics,
-            [
-                Logger(),
-            ],
-            deberta_batch_size=getattr(args, 'deberta_batch_size', 10),
-            train_data=train_dataset,
-            ignore_exceptions=args.ignore_exceptions,
-            background_train_data=background_train_dataset,
-            max_new_tokens=args.max_new_tokens,
-            ensemble_model=ensemble_model,
-            cache_path=args.cache_path,
-            language=getattr(args, 'language', 'en'),
-        )
+        
+        if getattr(args, "base_manager", None) is None:
+            man = UEManager(
+                dataset,
+                model,
+                estimators,
+                generation_metrics,
+                ue_metrics,
+                [
+                    Logger(),
+                ],
+                batch_size=args.batch_size,
+                deberta_batch_size=getattr(args, 'deberta_batch_size', 10),
+                train_data=train_dataset,
+                ignore_exceptions=args.ignore_exceptions,
+                background_train_data=background_train_dataset,
+                max_new_tokens=args.max_new_tokens,
+                ensemble_model=ensemble_model,
+                cache_path=args.cache_path,
+                language=getattr(args, 'language', 'en'),
+                save_stats=getattr(args, 'save_stats', []),
+                entropy_top_k=getattr(args, 'entropy_top_k', None),
+                save_path=save_path + f"/ue_manager_seed{seed}",
+            )
+        else:
+            man = UEManager.load(
+                args.base_manager,
+                data = dataset,
+                model = model,
+                estimators = estimators,
+                generation_metrics = generation_metrics,
+                ue_metrics = ue_metrics,
+                processors = [Logger()],
+                batch_size=args.batch_size,
+                deberta_batch_size=getattr(args, 'deberta_batch_size', 10),
+                train_data=train_dataset,
+                ignore_exceptions=args.ignore_exceptions,
+                background_train_data=background_train_dataset,
+                max_new_tokens=args.max_new_tokens,
+                ensemble_model=ensemble_model,
+                cache_path=args.cache_path,
+                language=getattr(args, 'language', 'en'),
+                save_stats=getattr(args, 'save_stats', []),
+                entropy_top_k=getattr(args, 'entropy_top_k', None),
+            )
 
         man()
 
-        man.save(save_path + f"/ue_manager_seed{seed}")
-
-
 def get_ue_metrics(args):
     ue_metrics = [
-        ReversedPairsProportion(),
+        #ReversedPairsProportion(),
         PredictionRejectionArea(),
         PredictionRejectionArea(max_rejection=0.5),
-        RiskCoverageCurveAUC(),
+        #RiskCoverageCurveAUC(),
     ]
     if getattr(args, "use_claim_ue", False):
         ue_metrics += [
@@ -265,10 +292,18 @@ def get_density_based_ue_methods(args, model_type):
 
 
 def get_ue_methods(args, model):
+    if getattr(args, "base_manager", None) is not None:
+        base_manager = UEManager.load(args.base_manager)
+        existing_estimators = list(base_manager.estimations.keys())
+    else:
+        existing_estimators = []
+
+    overwrite = getattr(args, "overwrite_base_estimations", False)
+
     estimators = []
     if getattr(args.model, "type", "Whitebox") == "Blackbox":
         if getattr(args, "use_seq_ue", False):
-            estimators += [
+            bb_estimators = [
                 LexicalSimilarity(metric="rouge1"),
                 LexicalSimilarity(metric="rouge2"),
                 LexicalSimilarity(metric="rougeL"),
@@ -285,6 +320,10 @@ def get_ue_methods(args, model):
                 Eccentricity(similarity_score="Jaccard_score"),
             ]
 
+            for estimator in bb_estimators:
+                if overwrite or ('sequence', str(estimator)) not in existing_estimators:
+                    estimators.append(estimator)
+
         if getattr(args, "use_ens_ue", False):
             raise NotImplementedError('Ensemble UE methods not applicable for blackbox models')
 
@@ -295,7 +334,7 @@ def get_ue_methods(args, model):
             raise NotImplementedError('Claim UE methods not applicable for blackbox models')
     else:
         if getattr(args, "use_seq_ue", False):
-            estimators += [
+            wb_estimators = [
                 MaximumSequenceProbability(),
                 Perplexity(),
                 MeanTokenEntropy(),
@@ -328,6 +367,10 @@ def get_ue_methods(args, model):
                 FisherRao(),
             ]
 
+            for estimator in wb_estimators:
+                if overwrite or ('sequence', str(estimator)) not in existing_estimators:
+                    estimators.append(estimator)
+
         if getattr(args, "use_ens_ue", False):
             # Ensemble-based UE methods have been disabled due to dependency on old
             # transformers code, which prevents bumping transformers version in 
@@ -348,7 +391,7 @@ def get_ue_methods(args, model):
             #estimators += (token_measures + sequence_measures)
 
         if getattr(args, "use_tok_ue", False):
-            estimators += [
+            tok_estimators = [
                 MaximumTokenProbability(),
                 TokenEntropy(),
                 PointwiseMutualInformation(),
@@ -356,8 +399,12 @@ def get_ue_methods(args, model):
                 SemanticEntropyToken(model.model_path, args.cache_path),
             ]
 
+            for estimator in tok_estimators:
+                if overwrite or ('token', str(estimator)) not in existing_estimators:
+                    estimators.append(estimator)
+
         if getattr(args, "use_claim_ue", False):
-            estimators += [
+            claim_estimators = [
                 MaximumClaimProbability(),
                 PerplexityClaim(),
                 MaxTokenEntropyClaim(),
@@ -367,12 +414,19 @@ def get_ue_methods(args, model):
                 ClaimConditionedProbabilityClaim(nli_context="fact_pref"),
             ]
 
+            for estimator in claim_estimators:
+                if overwrite or ('claim', str(estimator)) not in existing_estimators:
+                    estimators.append(estimator)
+
     additional_estimators = getattr(args, "additional_estimators", {})
 
     for estimator_args in additional_estimators:
         module = importlib.import_module(estimator_args.module)
         estimator_class = getattr(module, estimator_args.class_name)
-        estimators.append(estimator_class(**estimator_args.kwargs))
+        estimator = estimator_class(**estimator_args.kwargs)
+        # Additional estimator filtering only works correctly for sequence-level estimators
+        if overwrite or ('sequence', str(estimator)) not in existing_estimators:
+            estimators.append(estimator)
 
     return estimators
 
@@ -381,28 +435,104 @@ def get_generation_metrics(args):
     log.info("="*100)
     log.info("Initializing generation metrics...")
 
+    if getattr(args, "base_manager", None) is not None:
+        base_manager = UEManager.load(args.base_manager)
+        existing_metrics = list(base_manager.gen_metrics.keys())
+    else:
+        existing_metrics = []
+
     generation_metrics = getattr(args, "generation_metrics", None)
     if not generation_metrics:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        batch_size = 16
+        ckpt_path="https://huggingface.co/yzha/AlignScore/resolve/main/AlignScore-large.ckpt"
+        align_scorer = AlignScorer(
+            model="roberta-large",
+            batch_size=batch_size,
+            device=device,
+            ckpt_path=ckpt_path,
+            evaluation_mode="nli_sp",
+        )
+        api_key =getattr(args, "openai_api_key", '') 
         result = [
-            RougeMetric("rouge1"),
-            RougeMetric("rouge2"),
             RougeMetric("rougeL"),
             BLEUMetric(),
-            BertScoreMetric('rh'),
-            SbertMetric(),
             AccuracyMetric(
                 target_ignore_regex = getattr(args, "target_ignore_regex", None),
                 output_ignore_regex = getattr(args, "output_ignore_regex", None),
                 normalize = getattr(args, "normalize", False),
             ),
-            AlignScore(target_is_claims=False if args.task == "ats" else True),
+            AlignScore(align_scorer),
+            AlignScore(align_scorer, target_is_claims=False),
+            AlignScore(align_scorer, ignore_target=True),
+            # Sample-based metrics
+            RougeMetric("rougeL", sample=True),
+            BLEUMetric(sample=True),
+            AccuracyMetric(
+                target_ignore_regex = getattr(args, "target_ignore_regex", None),
+                output_ignore_regex = getattr(args, "output_ignore_regex", None),
+                normalize = getattr(args, "normalize", False),
+                sample=True,
+            ),
+            AlignScore(align_scorer, sample=True),
+            AlignScore(align_scorer, target_is_claims=False, sample=True),
+            AlignScore(align_scorer, ignore_target=True, sample=True),
+            # Best sample-based metrics
+            RougeMetric("rougeL", sample=True, sample_strategy="Best"),
+            BLEUMetric(sample=True, sample_strategy="Best"),
+            AccuracyMetric(
+                target_ignore_regex = getattr(args, "target_ignore_regex", None),
+                output_ignore_regex = getattr(args, "output_ignore_regex", None),
+                normalize = getattr(args, "normalize", False),
+                sample=True,
+                sample_strategy="Best",
+            ),
+            AlignScore(align_scorer, sample=True, sample_strategy="Best"),
+            AlignScore(align_scorer, target_is_claims=False, sample=True, sample_strategy="Best"),
+            AlignScore(align_scorer, ignore_target=True, sample=True, sample_strategy="Best"),
+            # Best normalized sample-based metrics
+            RougeMetric("rougeL", sample=True, sample_strategy="BestNormalized"),
+            BLEUMetric(sample=True, sample_strategy="BestNormalized"),
+            AccuracyMetric(
+                target_ignore_regex = getattr(args, "target_ignore_regex", None),
+                output_ignore_regex = getattr(args, "output_ignore_regex", None),
+                normalize = getattr(args, "normalize", False),
+                sample=True,
+                sample_strategy="BestNormalized",
+            ),
+            AlignScore(align_scorer, sample=True, sample_strategy="BestNormalized"),
+            AlignScore(align_scorer, target_is_claims=False, sample=True, sample_strategy="BestNormalized"),
+            AlignScore(align_scorer, ignore_target=True, sample=True, sample_strategy="BestNormalized"),
+            GptAccuracyMetric( api_key=api_key),
+            GptAccuracyMetric( api_key=api_key,sample=True, sample_strategy="Best"),
+            GptAccuracyMetric( api_key=api_key, sample=True, sample_strategy="First"),
         ]
+
         if getattr(args.model, "type", "Whitebox") != "Blackbox":
             if getattr(args, "use_claim_ue", False):
                 result += [OpenAIFactCheck(cache_path=args.cache_path, language=getattr(args, "language", "en"))]
         if args.task == "nmt":
             ignore_regex = getattr(args, "source_ignore_regex", None)
-            result += [Comet(source_ignore_regex = ignore_regex)]
+            comet_scorer = load("comet")
+            result += [Comet(comet_scorer, source_ignore_regex = ignore_regex),
+                       Comet(comet_scorer, source_ignore_regex = ignore_regex, sample=True),
+                       Comet(comet_scorer, source_ignore_regex = ignore_regex, sample=True, sample_strategy="Best"),
+                       Comet(comet_scorer, source_ignore_regex = ignore_regex, sample=True, sample_strategy="BestNormalized")]
+            model_name_or_path="google/metricx-24-hybrid-large-v2p6"
+            tokenizer_name="google/mt5-large"
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            model_xmetric = MT5ForRegression.from_pretrained(model_name_or_path)
+            model_xmetric.to(device)
+            model_xmetric.eval()
+
+            tokenizer_xmetric = AutoTokenizer.from_pretrained(
+                tokenizer_name if tokenizer_name else model_name_or_path
+            )
+
+            result += [XMetric(model=model_xmetric, tokenizer=tokenizer_xmetric, source_ignore_regex = ignore_regex),
+                       XMetric(model=model_xmetric, tokenizer=tokenizer_xmetric, source_ignore_regex = ignore_regex, sample=True),
+                       XMetric(model=model_xmetric, tokenizer=tokenizer_xmetric, source_ignore_regex = ignore_regex, sample=True, sample_strategy="Best"),
+                       XMetric(model=model_xmetric, tokenizer=tokenizer_xmetric, source_ignore_regex = ignore_regex, sample=True, sample_strategy="BestNormalized")]
     else:
         result = []
         for metric in generation_metrics:
@@ -410,6 +540,15 @@ def get_generation_metrics(args):
             metric_class = globals()[metric_name]
             metric_args = metric.get("args", [])
             result.append(metric_class(*metric_args))
+
+    # Filter out metrics that are already present in the base manager
+    filtered_result = []
+    for metric in result:
+        if (metric.level, str(metric)) in existing_metrics:
+            log.warning(f"Skipping metric {metric} as it is already present in the base manager.")
+        else:
+            filtered_result.append(metric)
+    result = filtered_result
 
     process_output_fn = getattr(args, "process_output_fn", None)
     process_target_fn = getattr(args, "process_target_fn", None)
@@ -433,7 +572,7 @@ def get_generation_metrics(args):
 
     if getattr(args, "multiref", False):
         # Wrap each metric in AggregatedMetric
-        result = [AggregatedMetric(base_metric=metric) for metric in result]
+        result = [AggregatedMetric(base_metric=metric)  if type(metric) != GptAccuracyMetric else metric for metric in result]
 
     log.info("Done with initializing generation metrics.")
 

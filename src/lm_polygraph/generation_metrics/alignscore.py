@@ -14,25 +14,44 @@ class AlignScore(GenerationMetric):
 
     def __init__(
         self,
+        scorer,
         lang="en",
-        ckpt_path="https://huggingface.co/yzha/AlignScore/resolve/main/AlignScore-large.ckpt",
-        batch_size=16,
         target_is_claims=True,
+        ignore_target=False,
+        sample: bool = False,
+        sample_strategy: str = "First",
     ):
-        super().__init__(["greedy_texts", "input_texts"], "sequence")
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if sample:
+            super().__init__([
+                "first_sample_texts",
+                "best_sample_texts",
+                "best_normalized_sample_texts",
+                "input_texts"],
+            "sequence")
+        else:
+            super().__init__(["greedy_texts", "input_texts"], "sequence")
+        self.sample = sample
+        self.sample_strategy = sample_strategy
         self.target_is_claims = target_is_claims
-        self.batch_size = batch_size
-        self.scorer = AlignScorer(
-            model="roberta-large",
-            batch_size=batch_size,
-            device=device,
-            ckpt_path=ckpt_path,
-            evaluation_mode="nli_sp",
-        )
+        self.ignore_target = ignore_target
+        self.scorer = scorer
 
     def __str__(self):
-        return "AlignScore"
+        base = "AlignScore"
+        if self.ignore_target:
+            base += "InputOutput"
+        elif self.target_is_claims:
+            base += "OutputTarget"
+        else:
+            base += "TargetOutput"
+
+        if self.sample:
+            if self.sample_strategy == "First":
+                return f"Sample{base}"
+            else:
+                return f"{self.sample_strategy}Sample{base}"
+
+        return base
 
     def __call__(
         self,
@@ -50,17 +69,34 @@ class AlignScore(GenerationMetric):
         Returns:
             np.ndarray: list of AlignScore Scores for each sample in input.
         """
-        greedy_texts = stats["greedy_texts"]
+        if self.sample:
+            if self.sample_strategy == "First":
+                gen_texts = stats["first_sample_texts"]
+            elif self.sample_strategy == "Best":
+                gen_texts = stats["best_sample_texts"]
+            elif self.sample_strategy == "BestNormalized":
+                gen_texts = stats["best_normalized_sample_texts"]
+            else:
+                raise ValueError(f"Invalid sample strategy: {self.sample_strategy}")
+        else:
+            gen_texts = stats["greedy_texts"]
+
+        input_texts = stats["input_texts"]
 
         filtered_targets = [x if len(x.strip()) else "(empty)" for x in target_texts]
-        filtered_outputs = [x if len(x.strip()) else "(empty)" for x in greedy_texts]
+        filtered_outputs = [x if len(x.strip()) else "(empty)" for x in gen_texts]
+        filtered_inputs = [x if len(x.strip()) else "(empty)" for x in input_texts]
 
-        if self.target_is_claims:
-            claims = filtered_targets
-            contexts = filtered_outputs
-        else:
+        if self.ignore_target:
             claims = filtered_outputs
-            contexts = filtered_targets
+            contexts = filtered_inputs
+        else:
+            if self.target_is_claims:
+                claims = filtered_targets
+                contexts = filtered_outputs
+            else:
+                claims = filtered_outputs
+                contexts = filtered_targets
 
         scores = np.array(
             self.scorer.score(

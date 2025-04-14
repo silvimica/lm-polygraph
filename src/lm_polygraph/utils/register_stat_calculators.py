@@ -18,6 +18,7 @@ def register_stat_calculators(
     n_ccp_alternatives: int = 10,
     cache_path=os.path.expanduser("~") + "/.cache",
     model: Model = None,
+    entropy_top_k: Optional[int] = None,
 ) -> Tuple[Dict[str, "StatCalculator"], Dict[str, List[str]]]:
     """
     Registers all available statistic calculators to be seen by UEManager for properly organizing the calculations
@@ -38,6 +39,7 @@ def register_stat_calculators(
         )
     else:
         raise Exception(f"Unsupported language: {language}")
+    nli_model = None
 
     log.info("=" * 100)
     log.info("Initializing stat calculators...")
@@ -62,15 +64,22 @@ def register_stat_calculators(
         _register(BlackboxSamplingGenerationCalculator())
     else:
         _register(GreedyProbsCalculator(n_alternatives=n_ccp_alternatives))
-        _register(EntropyCalculator())
+        _register(EntropyCalculator(top_k=entropy_top_k))
+        _register(SampleEntropyCalculator(top_k=entropy_top_k))
         _register(GreedyLMProbsCalculator())
-        _register(SamplingGenerationCalculator())
+        _register(SamplingGenerationCalculator(n_alternatives=n_ccp_alternatives))
+        _register(FirstSampleCalculator())
+        _register(BestSampleCalculator())
         _register(BartScoreCalculator())
         _register(ModelScoreCalculator())
         _register(EmbeddingsCalculator())
         _register(EnsembleTokenLevelDataCalculator())
         _register(CrossEncoderSimilarityMatrixCalculator(nli_model=nli_model))
+        _register(GreedySimilarityCalculator(nli_model=nli_model))
+        _register(RougeLSemanticMatrixCalculator())
+        _register(GreedyRougeLSemanticMatrixCalculator())
         _register(GreedyAlternativesNLICalculator(nli_model=nli_model))
+        _register(SampleAlternativesNLICalculator(nli_model=nli_model))
         _register(GreedyAlternativesFactPrefNLICalculator(nli_model=nli_model))
         _register(ClaimsExtractor(openai_chat=openai_chat, language=language))
         _register(

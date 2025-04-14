@@ -355,14 +355,18 @@ class WhiteboxModel(Model):
         def __call__(self, input_ids, scores, **kwargs) -> bool:
             # For efficiency, we compare the last n tokens where n is the number of tokens in the stop_sequence
             lookback_ids_batch = input_ids[:, self.initial_decoder_input_length :]
-
+            
             lookback_ids_batch = lookback_ids_batch[:, -self.sequence_id_len :]
 
             lookback_tokens_batch = self.tokenizer.batch_decode(lookback_ids_batch)
 
             for i, done in enumerate(self.done_tracker):
                 if not done:
-                    self.done_tracker[i] = self.sequence in lookback_tokens_batch[i]
+                    lookback_tokens_batch_i = lookback_tokens_batch[i]
+                    # Remove stop sequence from the begginning of the lookback tokens if it is there
+                    if len(lookback_tokens_batch_i) >= len(self.sequence) and lookback_tokens_batch_i[: len(self.sequence)] == self.sequence:
+                        lookback_tokens_batch_i = lookback_tokens_batch_i[len(self.sequence) :]
+                    self.done_tracker[i] = self.sequence in lookback_tokens_batch_i
             return False not in self.done_tracker
 
     def get_stopping_criteria(self, input_ids: torch.Tensor):
@@ -560,7 +564,7 @@ class WhiteboxModel(Model):
                 formatted_texts.append(formatted_chat)
             texts = formatted_texts
 
-        return self.tokenizer(texts, padding=True, return_tensors="pt")
+        return self.tokenizer(texts, padding=True, return_tensors="pt", return_token_type_ids=False)
 
 
 def create_ensemble(
