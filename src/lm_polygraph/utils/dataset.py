@@ -201,11 +201,11 @@ class Dataset:
             # ProX uses language subsets; pass `name=mmlu_lang`.
             # Columns (per HF viewer): question, option_0..option_9, answer (A..J), answer_index (0..9), category, cot_content, etc.
             # We ignore x_column/y_column here and build prompts ourselves.
-            _, dataset = Dataset.load_hf_dataset(dataset_path, split, name=mmlu_lang, **kwargs)
+            _, dataset = Dataset.load_hf_dataset(dataset_path, split, **kwargs)
 
             few_shot_dataset = None
             if n_shot > 0:
-                _, few_shot_dataset = Dataset.load_hf_dataset(dataset_path, few_shot_split, name=mmlu_lang, **kwargs)
+                _, few_shot_dataset = Dataset.load_hf_dataset(dataset_path, few_shot_split, **kwargs)
                 if len(few_shot_dataset) < n_shot:
                     raise ValueError(
                         f"Requested {n_shot} few-shot examples but only {len(few_shot_dataset)} available in {few_shot_split}."

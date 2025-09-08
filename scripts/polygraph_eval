@@ -96,13 +96,14 @@ def main(args):
             description=getattr(args, "description", ""),
             mmlu_max_subject_size=getattr(args, "mmlu_max_subject_size", 100),
             n_shot=getattr(args, "n_shot", 5),
-            few_shot_split=getattr(args, "few_shot_split", "train"),
+            few_shot_split=getattr(args, "few_shot_split", "validation"),
             few_shot_prompt=getattr(args, "few_shot_prompt", None),
             instruct=getattr(args, "instruct", None),
             split=args.eval_split,
             load_from_disk=args.load_from_disk,
             trust_remote_code=getattr(args, "trust_remote_code", False),
             mmlu_lang=getattr(args, "mmlu_lang", None),
+            size = getattr(args, "size", None),
             **cache_kwargs,
         )
         log.info("Done with loading eval data.")

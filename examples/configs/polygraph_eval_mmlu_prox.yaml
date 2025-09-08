@@ -4,7 +4,7 @@ hydra:
 
 defaults:
   - model: bloomz-560m
-  - estimators: default_estimators
+  - estimators: default_estimators_seq
   - stat_calculators: default_calculators
   - _self_
 
@@ -13,13 +13,16 @@ save_path: '${hydra:run.dir}'
 instruct: true
 task: qa
 
-dataset: ['li-lab/MMLU-ProX', 'continuation']
+dataset: ['li-lab/MMLU-ProX', 'fr']
 text_column: question
 label_column: answer
-train_split: train
+train_split: validation
 eval_split: test
-mmlu_lang: de
+mmlu_lang: fr
 max_new_tokens: 3
+n_shot: 0
+few_shot_prompt: "Q:{question}\nA. {choices[0]}\nB. {choices[1]}\nC. {choices[2]}\nD. {choices[3]}\nE. {choices[4]}\nF. {choices[5]}\nG. {choices[6]}\nH. {choices[7]}\nI. {choices[8]}\nJ. {choices[9]}\nGuess:{answer}"
+prompt: "Q:{question}\nA. {choices[0]}\nB. {choices[1]}\nC. {choices[2]}\nD. {choices[3]}\nE. {choices[4]}\nF. {choices[5]}\nG. {choices[6]}\nH. {choices[7]}\nI. {choices[8]}\nJ. {choices[9]}\nRespond with exactly one letter (A–J). Do not include any other text.\nGuess:{answer}"
 load_from_disk: false
 size: 10000
 generation_params:
