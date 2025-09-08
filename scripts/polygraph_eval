@@ -102,6 +102,7 @@ def main(args):
             split=args.eval_split,
             load_from_disk=args.load_from_disk,
             trust_remote_code=getattr(args, "trust_remote_code", False),
+            mmlu_lang=getattr(args, "mmlu_lang", None),
             **cache_kwargs,
         )
         log.info("Done with loading eval data.")

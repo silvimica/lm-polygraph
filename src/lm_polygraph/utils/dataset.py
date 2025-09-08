@@ -160,13 +160,14 @@ class Dataset:
         batch_size: int,
         prompt: str = "",
         description: str = "",
-        mmlu_max_subject_size: int = 100,
+        mmlu_max_subject_size: int = 100,   # kept for compatibility; unused for ProX
         n_shot: int = 0,
-        few_shot_split: str = "train",
+        few_shot_split: str = "validation", # ProX has validation/test; default few-shot from validation
         few_shot_prompt: Optional[str] = None,
         instruct: bool = False,
         split: str = "test",
         size: int = None,
+        mmlu_lang: Optional[str] = None,    # <- use this to pick the language subset, e.g. "en", "fr", ...
         **kwargs,
     ):
         """
@@ -174,15 +175,133 @@ class Dataset:
 
         Parameters:
             dataset_path (str): HF path to dataset,
-            x_column (str): name of column to take input texts from,
-            y_column (str): name of column to take target texts from,
+            x_column (str): name of column to take input texts from (ignored for MMLU-ProX),
+            y_column (str): name of column to take target texts from (ignored for MMLU-ProX),
             batch_size (int): the size of the texts batch,
             prompt (str): prompt template to use for input texts (default: ''),
-            split (str): dataset split to take data from (default: 'text'),
+            description (str): optional description header per-instance,
+            n_shot (int): number of few-shot exemplars to prepend,
+            few_shot_split (str): split to draw few-shot examples from (default: 'validation' for ProX),
+            few_shot_prompt (Optional[str]): separate few-shot formatting template when `instruct=True`,
+            instruct (bool): whether to use instruction-style few-shot formatting,
+            split (str): dataset split to take data from (default: 'test'),
             size (Optional[int]): size to subsample dataset to. If None, the full dataset split will be taken.
-                Default: None.
+            mmlu_lang (Optional[str]): language code for MMLU-ProX subset (e.g., 'en', 'fr', 'zh', ...).
         """
+
+        dataset_name = str(dataset_path)
+
+        # -------------------------
+        # Special handling: MMLU-ProX
+        # -------------------------
+        if "mmlu-prox" in dataset_name.lower():
+            if not mmlu_lang:
+                raise ValueError("For li-lab/MMLU-ProX you must provide `mmlu_lang` (e.g., 'en', 'fr', 'zh').")
+
+            # ProX uses language subsets; pass `name=mmlu_lang`.
+            # Columns (per HF viewer): question, option_0..option_9, answer (A..J), answer_index (0..9), category, cot_content, etc.
+            # We ignore x_column/y_column here and build prompts ourselves.
+            _, dataset = Dataset.load_hf_dataset(dataset_path, split, name=mmlu_lang, **kwargs)
+
+            few_shot_dataset = None
+            if n_shot > 0:
+                _, few_shot_dataset = Dataset.load_hf_dataset(dataset_path, few_shot_split, name=mmlu_lang, **kwargs)
+                if len(few_shot_dataset) < n_shot:
+                    raise ValueError(
+                        f"Requested {n_shot} few-shot examples but only {len(few_shot_dataset)} available in {few_shot_split}."
+                    )
+
+            if size is not None and size < len(dataset):
+                dataset = dataset.select(range(size))
+
+            # Map index -> letter for 10-way multiple choice
+            letters = list("ABCDEFGHIJ")
+
+            def extract_choices(inst):
+                # Collect options in order; guaranteed option_0..option_9 exist
+                return [inst[f"option_{i}"] for i in range(10)]
+
+            # Build few-shot prefix text (single string reused for all instances)
+            few_shot_prefix = ""
+            if n_shot > 0:
+                ids = np.random.choice(len(few_shot_dataset), n_shot, replace=False)
+                few_shot_data = few_shot_dataset.select(ids)
+
+                if instruct:
+                    if few_shot_prompt is None:
+                        raise AssertionError("`few_shot_prompt` must be provided when `instruct=True`.")
+                    # instruction-flavored
+                    few_shot_prefix = "Here are a few examples of questions and answers:\n\n"
+                    for inst in few_shot_data:
+                        choices = extract_choices(inst)
+                        # Use provided few_shot_prompt template
+                        few_shot_prefix += few_shot_prompt.format(
+                            choices=choices,
+                            question=str(inst["question"]).strip(),
+                            answer=letters[int(inst["answer_index"])],
+                            category=inst.get("category", "")
+                        ) + "\n\n"
+                    few_shot_prefix += "Now answer the following question in the same format:\n\n"
+                else:
+                    # plain format using `prompt` template
+                    for inst in few_shot_data:
+                        choices = extract_choices(inst)
+                        few_shot_prefix += prompt.format(
+                            choices=choices,
+                            question=str(inst["question"]).strip(),
+                            answer=letters[int(inst["answer_index"])],
+                            category=inst.get("category", "")
+                        ) + "\n"
+
+            # Build final X/Y
+            x, y = [], []
+            for inst in dataset:
+                choices = extract_choices(inst)
+
+                # Format the evaluation prompt for this item
+                # User-supplied `prompt` should expect {question}, {choices}, and {answer} (leave empty here)
+                formatted_prompt = prompt.format(
+                    choices=choices,
+                    question=str(inst["question"]).strip(),
+                    answer="",  # left blank for the model to fill
+                    category=inst.get("category", "")
+                )
+
+                # Optional description/header
+                prefix = ""
+                if description:
+                    # You can let the caller include things like language name in the description string if desired.
+                    # e.g., description="Language: {lang} | Category: {category}"
+                    # We support {lang} and {category} placeholders.
+                    prefix = description.format(
+                        lang=mmlu_lang,
+                        category=inst.get("category", "")
+                    ).strip()
+
+                full_input = (
+                    (prefix + "\n\n") if prefix else ""
+                ) + (few_shot_prefix if few_shot_prefix else "") + formatted_prompt
+
+                x.append(full_input)
+                # Ground-truth is the letter (A–J). Prefer `answer_index` for numeric robustness.
+                if "answer_index" in inst and inst["answer_index"] is not None:
+                    y.append(letters[int(inst["answer_index"])])
+                else:
+                    # Fallback to `answer` (expected to be "A".."J")
+                    y.append(str(inst["answer"]).strip())
+
+            return Dataset(x, y, batch_size)
+
+        # -------------------------
+        # Your existing logic (unaltered)
+        # -------------------------
         dataset_name, dataset = Dataset.load_hf_dataset(dataset_path, split, **kwargs)
+        few_shot_dataset = None
+
+        if n_shot > 0:
+            _, few_shot_dataset = Dataset.load_hf_dataset(
+                dataset_path, few_shot_split, **kwargs
+            )
 
         if size is not None and size < len(dataset):
             dataset = dataset.select(range(size))
@@ -193,6 +312,76 @@ class Dataset:
                 if len(inst[x_column]) <= 1024:
                     x.append(inst[x_column])
                     y.append(inst[y_column])
+
+        elif ("mmlu" in dataset_name.lower()) and mmlu_lang:
+            answers = ["A", "B", "C", "D"]
+            subjects = np.array(dataset["subject"])
+            few_shot_subjects = np.array(few_shot_dataset["subject"]) if few_shot_dataset is not None else None
+            x, y = [], []
+            for subject in np.unique(subjects):
+                formatted_description = description.format(
+                    subject=subject.replace("_", " ")
+                )
+                formatted_few_shot_prompt = ""
+                if n_shot > 0 and few_shot_dataset is not None:
+                    few_shot_subject = few_shot_dataset.select(
+                        np.argwhere(few_shot_subjects == subject).flatten()
+                    )
+                    few_shot_ids = np.random.choice(
+                        len(few_shot_subject), n_shot, replace=False
+                    )
+                    few_shot_data = few_shot_subject.select(few_shot_ids)
+                    if instruct:
+                        assert (
+                            few_shot_prompt is not None
+                        ), "separate few_shot_prompt must be provided for instruction mode."
+                        formatted_few_shot_prompt = (
+                            "Here are a few examples of questions and answers:\n\n"
+                        )
+                        for inst in few_shot_data:
+                            formatted_few_shot_prompt += (
+                                few_shot_prompt.format(
+                                    choices=inst["choices"],
+                                    question=inst["question"].strip(),
+                                    answer=answers[inst["answer"]],
+                                )
+                                + "\n\n"
+                            )
+                        formatted_few_shot_prompt += (
+                            "Now answer the following question in the same format:\n\n"
+                        )
+                    else:
+                        for inst in few_shot_data:
+                            formatted_few_shot_prompt += (
+                                prompt.format(
+                                    choices=inst["choices"],
+                                    question=inst["question"].strip(),
+                                    answer=answers[inst["answer"]],
+                                )
+                                + "\n"
+                            )
+
+                subject_data = dataset.select(
+                    np.argwhere(subjects == subject).flatten()
+                )
+
+                if len(subject_data) > mmlu_max_subject_size:
+                    subject_data = subject_data.select(range(mmlu_max_subject_size))
+
+                for inst in subject_data:
+                    formatted_prompt = prompt.format(
+                        choices=inst["choices"],
+                        question=inst["question"].strip(),
+                        answer="",
+                    )
+                    x.append(
+                        formatted_description
+                        + "\n\n"
+                        + formatted_few_shot_prompt
+                        + formatted_prompt
+                    )
+                    y.append(answers[inst[y_column]])
+
         else:
             x = dataset[x_column]
             if y_column is not None:
