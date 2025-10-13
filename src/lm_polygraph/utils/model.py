@@ -9,6 +9,7 @@ from dataclasses import asdict
 from typing import List, Dict, Optional, Union
 from abc import abstractmethod, ABC
 from transformers import (
+    AutoProcessor,
     AutoTokenizer,
     AutoModelForSeq2SeqLM,
     AutoModelForCausalLM,
@@ -314,6 +315,9 @@ class WhiteboxModel(Model):
         self.model = model
         self.tokenizer = tokenizer
         self.generation_parameters = generation_parameters
+        self.model_path = model_path
+        if "gemma" in model_path:
+            self.processor = AutoProcessor.from_pretrained(model_path)
 
     class _ScoresProcessor:
         # Stores original token scores instead of the ones modified with generation parameters
@@ -554,15 +558,30 @@ class WhiteboxModel(Model):
         """
         # Apply chat template if tokenizer has it
         if self.tokenizer.chat_template is not None:
-            formatted_texts = []
-            for chat in texts:
-                if isinstance(chat, str):
-                    chat = [{"role": "user", "content": chat}]
-                formatted_chat = self.tokenizer.apply_chat_template(
-                    chat, add_generation_prompt=True, tokenize=False
-                )
-                formatted_texts.append(formatted_chat)
-            texts = formatted_texts
+            if "gemma" in self.model_path:
+                chats = []
+                for chat in texts:
+                    if isinstance(chat, str):
+                        chat = [{"role": "user", "content": [{"type": "text", "text": chat}]}]
+                    chats.append(chat)
+
+                inputs = self.processor.apply_chat_template(
+                    chats, add_generation_prompt=True, tokenize=True,
+                    return_dict=True, return_tensors="pt"
+                ).to(model.device, dtype=torch.bfloat16) 
+
+               return inputs
+            else:
+                formatted_texts = []
+                for chat in texts:
+                    if isinstance(chat, str):
+                        chat = [{"role": "user", "content": chat}]
+                    formatted_chat = self.tokenizer.apply_chat_template(
+                        chat, add_generation_prompt=True, tokenize=False
+                    )
+                    formatted_texts.append(formatted_chat)
+                texts = formatted_texts
+
         return self.tokenizer(texts, padding=True, return_tensors="pt", return_token_type_ids=False)
 
 def create_ensemble(
