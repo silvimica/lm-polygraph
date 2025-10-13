@@ -55,14 +55,17 @@ additional_estimators:
     class_name: PTrue
     kwargs: {}
   - module: lm_polygraph.estimators.p_true
-    class_name: PTrueFirstSample
-    kwargs: {}
+    class_name: PTrue
+    kwargs:
+      dependency: p_true_first_sample
   - module: lm_polygraph.estimators.p_true
-    class_name: PTrueBestSample
-    kwargs: {}
+    class_name: PTrue
+    kwargs:
+      dependency: p_true_best_sample
   - module: lm_polygraph.estimators.p_true
-    class_name: PTrueMbrSample
-    kwargs: {}
+    class_name: PTrue
+    kwargs:
+      dependency: p_true_mbr_sample
 
 generation_metrics:
   - name: RougeMetric
