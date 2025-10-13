@@ -568,7 +568,7 @@ class WhiteboxModel(Model):
                 inputs = self.processor.apply_chat_template(
                     chats, add_generation_prompt=True, tokenize=True,
                     return_dict=True, return_tensors="pt"
-                ).to(model.device, dtype=torch.bfloat16) 
+                ).to(self.model.device, dtype=torch.bfloat16) 
 
                 return inputs
             else:
