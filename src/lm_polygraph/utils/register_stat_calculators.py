@@ -82,29 +82,54 @@ def register_stat_calculators(
         _register(SampleAlternativesNLICalculator(nli_model=nli_model))
         _register(GreedyAlternativesFactPrefNLICalculator(nli_model=nli_model))
         _register(ClaimsExtractor(openai_chat=openai_chat, language=language))
+        base_ptrue_prompt = "Question: {q}\n Possible answer:{a}\n Is the possible answer:\n (A) True\n (B) False\n The possible answer is:"
         _register(
             PromptCalculator(
-                "Question: {q}\n Possible answer:{a}\n "
-                "Is the possible answer:\n (A) True\n (B) False\n The possible answer is:",
-                "True",
-                "p_true",
+                prompt=base_ptrue_prompt,
+                expected="True",
+                method="p_true",
                 sample_text_dependency=None,  # Not calculate T text samples for P(True)
             )
         )
         _register(
             PromptCalculator(
-                "Question: {q}\n Here are some ideas that were brainstormed: {s}\n Possible answer:{a}\n "
-                "Is the possible answer:\n (A) True\n (B) False\n The possible answer is:",
-                "True",
-                "p_true_sampling",
+                prompt=base_ptrue_prompt,
+                expected="True",
+                method="p_true_first_sample",
+                sample_text_dependency=None,  # Not calculate T text samples for P(True)
+                generation_text_dependency="first_sample_texts",
             )
         )
         _register(
             PromptCalculator(
-                "Question: {q}\n Possible answer:{a}\n "
-                "Is the possible answer True or False? The possible answer is: ",
-                "True",
-                "p_true_claim",
+                prompt=base_ptrue_prompt,
+                expected="True",
+                method="p_true_best_sample",
+                sample_text_dependency=None,  # Not calculate T text samples for P(True)
+                generation_text_dependency="best_sample_texts",
+            )
+        )
+        _register(
+            PromptCalculator(
+                prompt=base_ptrue_prompt,
+                expected="True",
+                method="p_true_mbr_sample",
+                sample_text_dependency=None,  # Not calculate T text samples for P(True)
+                generation_text_dependency="mbr_sample_texts",
+            )
+        )
+        _register(
+            PromptCalculator(
+                prompt="Question: {q}\n Here are some ideas that were brainstormed: {s}\n Possible answer:{a}\n Is the possible answer:\n (A) True\n (B) False\n The possible answer is:",
+                expected="True",
+                method="p_true_sampling",
+            )
+        )
+        _register(
+            PromptCalculator(
+                prompt="Question: {q}\n Possible answer:{a}\n Is the possible answer True or False? The possible answer is: ",
+                expected="True",
+                method="p_true_claim",
                 input_text_dependency="claim_input_texts_concatenated",
                 sample_text_dependency=None,
                 generation_text_dependency="claim_texts_concatenated",

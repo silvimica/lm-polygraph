@@ -4,6 +4,8 @@ from typing import Dict
 
 from .estimator import Estimator
 
+def to_camel_case(snake_str):
+    return "".join(x.capitalize() for x in snake_str.lower().split("_"))
 
 class PTrue(Estimator):
     """
@@ -21,11 +23,13 @@ class PTrue(Estimator):
     and calculates the log-probability of 'True' token with minus sign.
     """
 
-    def __init__(self):
-        super().__init__(["p_true"], "sequence")
+    def __init__(self, dependency: str = "p_true"):
+        super().__init__([dependency], "sequence")
+        self.dependency = dependency
 
     def __str__(self):
-        return "PTrue"
+        # camelize dependency name for better readability
+        return to_camel_case(self.dependency)
 
     def __call__(self, stats: Dict[str, np.ndarray]) -> np.ndarray:
         """
@@ -38,5 +42,5 @@ class PTrue(Estimator):
             np.ndarray: float uncertainty for each sample in input statistics.
                 Higher values indicate more uncertain samples.
         """
-        ptrue = stats["p_true"]
+        ptrue = stats[self.dependency]
         return -np.array(ptrue)

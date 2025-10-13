@@ -57,6 +57,15 @@ additional_estimators:
   - module: lm_polygraph.estimators.p_true
     class_name: PTrue
     kwargs: {}
+  - module: lm_polygraph.estimators.p_true
+    class_name: PTrueFirstSample
+    kwargs: {}
+  - module: lm_polygraph.estimators.p_true
+    class_name: PTrueBestSample
+    kwargs: {}
+  - module: lm_polygraph.estimators.p_true
+    class_name: PTrueMbrSample
+    kwargs: {}
 
 generation_metrics:
   - name: AccuracyMetric
