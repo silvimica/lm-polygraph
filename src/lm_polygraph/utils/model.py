@@ -570,7 +570,7 @@ class WhiteboxModel(Model):
                     return_dict=True, return_tensors="pt"
                 ).to(model.device, dtype=torch.bfloat16) 
 
-               return inputs
+                return inputs
             else:
                 formatted_texts = []
                 for chat in texts:
