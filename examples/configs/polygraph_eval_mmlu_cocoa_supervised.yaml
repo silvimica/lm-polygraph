@@ -73,7 +73,23 @@ use_density_based_ue: false
 use_seq_ue: false
 use_tok_ue: false
 use_ens_ue: false
-generation_metrics: null
+
+additional_estimators: 
+  - module: lm_polygraph.estimators.p_true
+    class_name: PTrue
+    kwargs: {}
+  - module: lm_polygraph.estimators.p_true
+    class_name: PTrue
+    kwargs:
+      dependency: p_true_first_sample
+  - module: lm_polygraph.estimators.p_true
+    class_name: PTrue
+    kwargs:
+      dependency: p_true_best_sample
+  - module: lm_polygraph.estimators.p_true
+    class_name: PTrue
+    kwargs:
+      dependency: p_true_mbr_sample
 
 ignore_exceptions: false
 
