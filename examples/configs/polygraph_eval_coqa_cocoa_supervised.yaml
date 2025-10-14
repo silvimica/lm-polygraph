@@ -87,6 +87,113 @@ additional_estimators:
     class_name: PTrue
     kwargs:
       dependency: p_true_mbr_sample
+  - module: lm_polygraph.estimators.greedy_supervised_cocoa
+    class_name: SupervisedCocoaMSP
+    kwargs: {}
+  - module: lm_polygraph.estimators.greedy_supervised_cocoa
+    class_name: SupervisedCocoaPPL
+    kwargs: {}
+  - module: lm_polygraph.estimators.greedy_supervised_cocoa
+    class_name: SupervisedCocoaMTE
+    kwargs: {}
+  - module: lm_polygraph.estimators.max_probability
+    class_name: MaximumSequenceProbability
+    kwargs: {}
+  - module: lm_polygraph.estimators.perplexity
+    class_name: Perplexity
+    kwargs: {}
+  - module: lm_polygraph.estimators.token_entropy
+    class_name: MeanTokenEntropy
+    kwargs: {}
+  - module: lm_polygraph.estimators.max_probability
+    class_name: SampledMaximumSequenceProbability
+    kwargs:
+      sample_strategy: best
+  - module: lm_polygraph.estimators.perplexity
+    class_name: SampledPerplexity
+    kwargs:
+      sample_strategy: best
+  - module: lm_polygraph.estimators.token_entropy
+    class_name: SampledMeanTokenEntropy
+    kwargs:
+      sample_strategy: best
+  - module: lm_polygraph.estimators.max_probability
+    class_name: SampledMaximumSequenceProbability
+    kwargs:
+      sample_strategy: mbr
+  - module: lm_polygraph.estimators.perplexity
+    class_name: SampledPerplexity
+    kwargs:
+      sample_strategy: mbr
+  - module: lm_polygraph.estimators.token_entropy
+    class_name: SampledMeanTokenEntropy
+    kwargs:
+      sample_strategy: mbr
+  - module: lm_polygraph.estimators.greedy_semantic_average_ue_average_similarity
+    class_name: GreedySemanticEnrichedMaxprobAveDissimilarity
+    kwargs: {}
+  - module: lm_polygraph.estimators.greedy_semantic_average_ue_average_similarity
+    class_name: GreedySemanticEnrichedPPLAveDissimilarity
+    kwargs: {}
+  - module: lm_polygraph.estimators.greedy_semantic_average_ue_average_similarity
+    class_name: GreedySemanticEnrichedMTEAveDissimilarity
+    kwargs: {}
+  - module: lm_polygraph.estimators.semantic_average_ue_average_similarity
+    class_name: SemanticEnrichedMaxprobAveDissimilarity
+    kwargs:
+      sample_strategy: best
+  - module: lm_polygraph.estimators.semantic_average_ue_average_similarity
+    class_name: SemanticEnrichedPPLAveDissimilarity
+    kwargs:
+      sample_strategy: best
+  - module: lm_polygraph.estimators.semantic_average_ue_average_similarity
+    class_name: SemanticEnrichedMTEAveDissimilarity
+    kwargs:
+      sample_strategy: best
+  - module: lm_polygraph.estimators.semantic_average_ue_average_similarity
+    class_name: SemanticEnrichedMaxprobAveDissimilarity
+    kwargs:
+      sample_strategy: mbr
+  - module: lm_polygraph.estimators.semantic_average_ue_average_similarity
+    class_name: SemanticEnrichedPPLAveDissimilarity
+    kwargs:
+      sample_strategy: mbr
+  - module: lm_polygraph.estimators.semantic_average_ue_average_similarity
+    class_name: SemanticEnrichedMTEAveDissimilarity
+    kwargs:
+      sample_strategy: mbr
+  - module: lm_polygraph.estimators.monte_carlo_sequence_entropy
+    class_name: MonteCarloSequenceEntropy
+    kwargs: {}
+  - module: lm_polygraph.estimators.monte_carlo_normalized_sequence_entropy
+    class_name: MonteCarloNormalizedSequenceEntropy
+    kwargs: {}
+  - module: lm_polygraph.estimators.sar
+    class_name: SAR
+    kwargs: {}
+  - module: lm_polygraph.estimators.deg_mat
+    class_name: DegMat
+    kwargs: {}
+  - module: lm_polygraph.estimators.eig_val_laplacian
+    class_name: EigValLaplacian
+    kwargs: {}
+  - module: lm_polygraph.estimators.semantic_entropy
+    class_name: SemanticEntropy
+    kwargs: {}
+  - module: lm_polygraph.estimators.greedy_semantic_average_ue_average_similarity
+    class_name: GreedyAveDissimilarity
+    kwargs: {}
+  - module: lm_polygraph.estimators.semantic_average_ue_average_similarity
+    class_name: AveDissimilarity
+    kwargs:
+      sample_strategy: best
+  - module: lm_polygraph.estimators.semantic_average_ue_average_similarity
+    class_name: AveDissimilarity
+    kwargs:
+      sample_strategy: mbr
+  - module: lm_polygraph.estimators.greedy_supervised_cocoa
+    class_name: SupervisedCocoa
+    kwargs: {}
 
 ignore_exceptions: false
 
