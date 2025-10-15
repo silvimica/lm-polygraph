@@ -89,15 +89,6 @@ additional_estimators:
     class_name: PTrue
     kwargs:
       dependency: p_true_mbr_sample
-  - module: lm_polygraph.estimators.greedy_supervised_cocoa
-    class_name: SupervisedCocoaMSP
-    kwargs: {}
-  - module: lm_polygraph.estimators.greedy_supervised_cocoa
-    class_name: SupervisedCocoaPPL
-    kwargs: {}
-  - module: lm_polygraph.estimators.greedy_supervised_cocoa
-    class_name: SupervisedCocoaMTE
-    kwargs: {}
   - module: lm_polygraph.estimators.max_probability
     class_name: MaximumSequenceProbability
     kwargs: {}
@@ -193,9 +184,6 @@ additional_estimators:
     class_name: AveDissimilarity
     kwargs:
       sample_strategy: mbr
-  - module: lm_polygraph.estimators.greedy_supervised_cocoa
-    class_name: SupervisedCocoa
-    kwargs: {}
 
 ignore_exceptions: false
 
