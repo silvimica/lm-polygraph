@@ -4,7 +4,7 @@ import torch
 def load_model(model_path: str, device_map: str, dtype: str = "float32"):
     dtype = getattr(torch, dtype)
     model = AutoModelForCausalLM.from_pretrained(
-        model_path, trust_remote_code=True, device_map=device_map, torch_dtype=dtype
+        model_path, trust_remote_code=True, device_map=device_map, torch_dtype=dtype, attn_implementation='eager'
     )
     model.eval()
 
