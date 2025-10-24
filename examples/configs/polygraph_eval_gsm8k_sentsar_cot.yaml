@@ -43,6 +43,10 @@ save_stats:
   - sample_sentence_similarity
   - sample_token_similarity
   - sample_entropy
+  - semantic_matrix_entail
+  - semantic_matrix_contra
+  - semantic_matrix_classes
+  - semantic_classes_entail
   - first_sample_texts
   - best_sample_texts
   - best_sample_text_ids
