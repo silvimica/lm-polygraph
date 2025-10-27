@@ -61,7 +61,7 @@ class SemanticClassesCalculator(StatCalculator):
 
         return sample_to_class, class_to_sample
 
-    def determine_class(self, idx: int, i: int, class_to_sample: List, sample_to_class: Dict, entailment: np.ndarray):
+    def determine_class(self, i: int, class_to_sample: List, sample_to_class: Dict, entailment: np.ndarray):
         # For first hypo just create a zeroth class
         if i == 0:
             class_to_sample.append([0])
