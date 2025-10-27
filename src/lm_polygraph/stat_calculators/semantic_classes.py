@@ -37,7 +37,7 @@ class SemanticClassesCalculator(StatCalculator):
         )
 
         result = []
-        for hyp, entailment in zip(dependecies["sample_texts"], batch_entailment):
+        for hyp, entailment in zip(dependencies["sample_texts"], batch_entailment):
             sample_to_class, class_to_sample = self.get_classes(hyp, entailment)
             result.append(
                 {
