@@ -128,7 +128,7 @@ class SemanticMatrixCalculator(StatCalculator):
             "semantic_matrix_contra": C,
             "semantic_matrix_neutral": N,
             "semantic_matrix_classes": P,
-            "entailment_id": deberta.deberta.config.label2id["ENTAILMENT"],
+            "entailment_id": np.array([ent_id] * len(batch_texts)),
         }
 
 
@@ -250,5 +250,5 @@ class ConcatSemanticMatrixCalculator(StatCalculator):
             "concat_semantic_matrix_contra": C,
             "concat_semantic_matrix_neutral": N,
             "concat_semantic_matrix_classes": P,
-            "entailment_id": deberta.deberta.config.label2id["ENTAILMENT"],
+            "entailment_id": np.array([ent_id] * len(batch_texts)),
         }
