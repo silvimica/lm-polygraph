@@ -32,52 +32,57 @@ class SemanticClassesCalculator(StatCalculator):
         model: WhiteboxModel,
         max_new_tokens: int = 100,
     ) -> Dict[str, np.ndarray]:
-        self._is_entailment = (
-            dependencies["semantic_matrix_classes"] == dependencies["entailment_id"]
+        batch_entailment = (
+            dependencies["semantic_matrix_classes"] == dependencies["entailment_id"][0]
         )
-        self.get_classes(dependencies["sample_texts"])
+
+        result = []
+        for hyp, entailment in zip(dependecies["sample_texts"], batch_entailment):
+            sample_to_class, class_to_sample = self.get_classes(hyp, entailment)
+            result.append(
+                {
+                    "sample_to_class": sample_to_class,
+                    "class_to_sample": class_to_sample,
+                }
+            )
 
         return {
-            "semantic_classes_entail": {
-                "sample_to_class": self._sample_to_class,
-                "class_to_sample": self._class_to_sample,
-            }
+            "semantic_classes_entail": result
         }
 
-    def get_classes(self, hyps_list: List[List[str]]):
-        self._sample_to_class = {}
-        self._class_to_sample: Dict[int, List] = defaultdict(list)
+    def get_classes(self, hyp: List[str], entailment: np.ndarray):
+        class_to_sample = []
+        sample_to_class = {}
 
         [
-            self._determine_class(idx, i)
-            for idx, hyp in enumerate(hyps_list)
+            self.determine_class(i, class_to_sample, sample_to_class, entailment)
             for i in range(len(hyp))
         ]
 
-        return self._sample_to_class, self._class_to_sample
+        return sample_to_class, class_to_sample
 
-    def _determine_class(self, idx: int, i: int):
+    def determine_class(self, idx: int, i: int, class_to_sample: List, sample_to_class: Dict, entailment: np.ndarray):
         # For first hypo just create a zeroth class
         if i == 0:
-            self._class_to_sample[idx] = [[0]]
-            self._sample_to_class[idx] = {0: 0}
+            class_to_sample.append([0])
+            sample_to_class[0] = 0
 
             return 0
 
         # Iterate over existing classes and return if hypo belongs to one of them
-        for class_id in range(len(self._class_to_sample[idx])):
-            class_text_id = self._class_to_sample[idx][class_id][0]
-            forward_entailment = self._is_entailment[idx, class_text_id, i]
-            backward_entailment = self._is_entailment[idx, i, class_text_id]
+        for class_id in range(len(class_to_sample)):
+            class_text_id = class_to_sample[class_id][0]
+            forward_entailment = entailment[class_text_id, i]
+            backward_entailment = entailment[i, class_text_id]
             if forward_entailment and backward_entailment:
-                self._class_to_sample[idx][class_id].append(i)
-                self._sample_to_class[idx][i] = class_id
+                class_to_sample[class_id].append(i)
+                sample_to_class[i] = class_id
 
                 return class_id
 
         # If none of the existing classes satisfy - create new one
-        new_class_id = len(self._class_to_sample[idx])
-        self._sample_to_class[idx][i] = new_class_id
-        self._class_to_sample[idx].append([i])
+        new_class_id = len(class_to_sample)
+        sample_to_class[i] = new_class_id
+        class_to_sample.append([i])
 
         return new_class_id
