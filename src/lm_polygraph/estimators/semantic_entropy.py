@@ -58,15 +58,13 @@ class SemanticEntropy(Estimator):
             loglikelihoods_list = None
             hyps_list = stats["sample_texts"]
 
-        self._class_to_sample = stats["semantic_classes_entail"]["class_to_sample"]
-        self._sample_to_class = stats["semantic_classes_entail"]["sample_to_class"]
-
-        return self.batched_call(hyps_list, loglikelihoods_list)
+        return self.batched_call(hyps_list, loglikelihoods_list, stats["semantic_classes_entail"])
 
     def batched_call(
         self,
         hyps_list: List[List[str]],
         loglikelihoods_list: Optional[List[List[float]]],
+        classes: List[Dict],
         log_weights: Optional[List[List[float]]] = None,
     ) -> np.array:
         if log_weights is None:
@@ -75,10 +73,13 @@ class SemanticEntropy(Estimator):
         semantic_logits = {}
         # Iteration over batch
         for i in range(len(hyps_list)):
+            class_to_sample = classes[i]["class_to_sample"]
+            sample_to_class = classes[i]["sample_to_class"]
+
             if self.class_probability_estimation == "sum":
                 class_likelihoods = [
                     np.array(loglikelihoods_list[i])[np.array(class_idx)]
-                    for class_idx in self._class_to_sample[i]
+                    for class_idx in class_to_sample
                 ]
                 class_lp = [
                     np.logaddexp.reduce(likelihoods)
@@ -89,7 +90,7 @@ class SemanticEntropy(Estimator):
                 class_lp = np.log(
                     [
                         len(class_idx) / num_samples
-                        for class_idx in self._class_to_sample[i]
+                        for class_idx in class_to_sample
                     ]
                 )
 
@@ -97,7 +98,7 @@ class SemanticEntropy(Estimator):
                 log_weights[i] = [0 for _ in hyps_list[i]]
             semantic_logits[i] = -np.mean(
                 [
-                    class_lp[self._sample_to_class[i][j]] * np.exp(log_weights[i][j])
+                    class_lp[sample_to_class[j]] * np.exp(log_weights[i][j])
                     for j in range(len(hyps_list[i]))
                 ]
             )
