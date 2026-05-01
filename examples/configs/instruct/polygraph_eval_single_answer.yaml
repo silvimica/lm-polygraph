@@ -1,0 +1,42 @@
+hydra:
+  run:
+    dir: ${cache_path}/${task}/${model}/${dataset_name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+defaults:
+  - model: bloomz-560m
+  - estimators: default_estimators_source
+  - stat_calculators: default_calculators
+  - base_processing_triviaqa
+  - _self_
+
+cache_path: ./workdir/output
+save_path: '${hydra:run.dir}'
+instruct: true
+description: "Answer the following question. Write your answer as plain text in one continuous line with no line breaks or markdown. Do not include \n or extra whitespace.
+task: qa
+
+dataset_name: rewrites_csv
+dataset: /home/maiya.goloburda/why_dont_know/merged_rewrites_gpt-5.csv
+text_column: single_rewrite
+label_column: single_target
+train_split: train
+eval_split: test
+max_new_tokens: 50
+load_from_disk: false
+multiref: false
+trust_remote_code: false
+size: 10000
+generation_params:
+  stop_strings:
+    - "\n"
+
+subsample_eval_dataset: -1
+
+generation_metrics: null
+
+ignore_exceptions: false
+
+batch_size: 2
+
+seed:
+    - 1
