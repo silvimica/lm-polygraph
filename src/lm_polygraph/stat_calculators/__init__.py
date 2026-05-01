@@ -51,7 +51,7 @@ from .semantic_matrix import SemanticMatrixCalculator
 from .raw_input import RawInputCalculator
 from .greedy_semantic_matrix import (
     GreedySemanticMatrixCalculator,
-    ConcatGreedySemanticMatrixCalculator,
+    ConcatGreedySemanticMatrixCalculator, BaseGreedySemanticMatrixCalculator
 )
 from .cross_encoder_similarity import CrossEncoderSimilarityMatrixCalculator
 from .greedy_cross_encoder_similarity import (

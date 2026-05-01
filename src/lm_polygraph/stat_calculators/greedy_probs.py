@@ -41,12 +41,13 @@ class GreedyProbsCalculator(StatCalculator):
         output_attentions: bool = True,
         output_hidden_states: bool = False,
         n_alternatives: int = 10,
+        all_layers: bool = True,   
     ):
         super().__init__()
         self.output_attentions = output_attentions
         self.output_hidden_states = output_hidden_states
         self.n_alternatives = n_alternatives
-
+        self.all_layers = all_layers
     def _preprocess_attention(
         self,
         attentions: torch.Tensor,
@@ -93,7 +94,7 @@ class GreedyProbsCalculator(StatCalculator):
         dependencies: Dict[str, np.array],
         texts: List[str],
         model: Union[WhiteboxModel, WhiteboxModelvLLM],
-        max_new_tokens: int = 100,
+        max_new_tokens: int = 100
     ) -> Dict[str, np.ndarray]:
         """
         Calculates the statistics of probabilities at each token position in the generation.
@@ -143,13 +144,22 @@ class GreedyProbsCalculator(StatCalculator):
                 attentions = out.attentions
             if self.output_hidden_states:
                 embeddings_encoder, embeddings_decoder = get_embeddings_from_output(
-                    out, batch, model.model_type
+                    out,
+                    batch,
+                    model.model_type,
+                    all_layers=self.all_layers,   
                 )
-                if embeddings_decoder.dtype == torch.bfloat16:
-                    embeddings_decoder = embeddings_decoder.to(
-                        torch.float16
-                    )  # numpy does not support bfloat16
 
+                if isinstance(embeddings_decoder, dict):
+                    for category, layer_dict in embeddings_decoder.items():   # "mean", "last"
+                        if isinstance(layer_dict, dict):
+                            for layer_name, layer_emb in layer_dict.items():
+                                if isinstance(layer_emb, torch.Tensor) and layer_emb.dtype == torch.bfloat16:
+                                    embeddings_decoder[category][layer_name] = layer_emb.to(torch.float16)
+
+                else:
+                    if embeddings_decoder.dtype == torch.bfloat16:
+                        embeddings_decoder = embeddings_decoder.to(torch.float16)
         cut_logits = []
         cut_sequences = []
         cut_texts = []
@@ -241,14 +251,29 @@ class GreedyProbsCalculator(StatCalculator):
         if not self.output_hidden_states:
             embeddings_dict = {}
         elif model.model_type == "CausalLM":
-            embeddings_dict = {
-                "embeddings_decoder": embeddings_decoder.cpu().detach().numpy(),
-            }
+            if self.all_layers and isinstance(embeddings_decoder, dict):
+                embeddings_dict = {
+                    "embeddings_decoder": {
+                        category: {
+                            layer_name: layer_emb.cpu().detach().numpy()
+                            for layer_name, layer_emb in layers.items()
+                        }
+                        for category, layers in embeddings_decoder.items()
+                    }
+                }
+
+            else:
+                # single layer tensor
+                embeddings_dict = {
+                    "embeddings_decoder": embeddings_decoder.cpu().detach().numpy(),
+                }
+
         elif model.model_type == "Seq2SeqLM":
             embeddings_dict = {
                 "embeddings_encoder": embeddings_encoder.cpu().detach().numpy(),
                 "embeddings_decoder": embeddings_decoder.cpu().detach().numpy(),
             }
+
         else:
             raise NotImplementedError
 

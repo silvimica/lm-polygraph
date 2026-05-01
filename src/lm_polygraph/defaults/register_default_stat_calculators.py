@@ -16,6 +16,7 @@ def register_default_stat_calculators(
     output_attentions: bool = True,
     output_hidden_states: bool = True,
     deberta_batch_size: int = 10,
+    all_layers: bool = False
 ) -> List[StatCalculatorContainer]:
     """
     Specifies the list of the default stat_calculators that could be used in the evaluation scripts and
@@ -88,12 +89,14 @@ def register_default_stat_calculators(
             )
 
     elif model_type == "Whitebox":
+        print("all_layers",all_layers)
         _register(
             GreedyProbsCalculator,
             "lm_polygraph.defaults.stat_calculator_builders.default_GreedyProbsCalculator",
             {
                 "output_attentions": output_attentions,
                 "output_hidden_states": output_hidden_states,
+                "all_layers": True,
             },
         )
         _register(EntropyCalculator)

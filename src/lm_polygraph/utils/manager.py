@@ -417,8 +417,21 @@ class UEManager:
                 processor.on_batch(batch_stats, batch_gen_metrics, batch_estimations)
 
             for key in self.save_stats:
-                if key in batch_stats.keys():
-                    self.stats[key] += list(batch_stats[key])
+                if key in batch_stats:
+                    value = batch_stats[key]
+
+                    # For nested dict stats like embeddings_decoder
+                    if isinstance(value, dict):
+                        # store one dict per batch
+                        self.stats[key].append(value)
+                    else:
+                        # old behavior for arrays / lists / scalars
+                        try:
+                            self.stats[key] += list(value)
+                        except TypeError:
+                            # not iterable (e.g. scalar) → just append
+                            self.stats[key].append(value)
+
 
         self._process(iterable_data, fn_on_batch_callback)
 

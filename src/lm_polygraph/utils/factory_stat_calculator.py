@@ -30,6 +30,7 @@ class StatCalculatorContainer:
         self.stats = stats if stats is not None else []
         self.dependencies = dependencies if dependencies is not None else []
         self.obj = obj
+        print(cfg)
         self.cfg = cfg
         self.builder = builder
 

@@ -24,39 +24,75 @@ def get_embeddings_from_output(
     batch_size = len(batch["input_ids"])
 
     if model_type in ["CausalLM", "VisualLM"]:
-        input_tokens_hs = output.hidden_states[0][hidden_layer].cpu().detach()
-        if not all_layers:
+        # output.hidden_states: list/tuple over time steps
+        # each element: tuple over layers
+        #   output.hidden_states[t][l] -> (batch, seq_len_t, hidden_dim)
+        if all_layers:
+            n_layers = len(output.hidden_states[0])
+            
+            batch_embeddings_decoder = {
+                "mean": {},
+                "last": {},
+            }
+
+            for layer_idx in range(n_layers):
+                # prompt hidden states at this layer
+                input_tokens_hs = output.hidden_states[0][layer_idx].cpu().detach()
+
+                # generated hidden states (if any)
+                if len(output.hidden_states) > 1:
+                    generated_tokens_hs = torch.cat(
+                        [h[layer_idx].cpu().detach() for h in output.hidden_states[1:]],
+                        dim=1,
+                    )  # [batch, seq_gen, hidden_dim]
+                    full_seq = torch.cat([input_tokens_hs, generated_tokens_hs], dim=1)
+                else:
+                    generated_tokens_hs = None
+                    full_seq = input_tokens_hs
+
+                # mean pooling over full sequence 
+                mean_emb = full_seq.mean(dim=1) 
+
+                #  last-token embedding 
+                last_emb = full_seq[:, -1, :]   
+
+                # save both
+                batch_embeddings_decoder["mean"][f"layer_{layer_idx}"] = mean_emb
+                batch_embeddings_decoder["last"][f"layer_{layer_idx}"] = last_emb
+
+        else:
+            # Old behavior: single layer, controlled by hidden_layer
+            input_tokens_hs = output.hidden_states[0][hidden_layer].cpu().detach()
             if len(output.hidden_states) > 1:
                 generated_tokens_hs = torch.cat(
                     [h[hidden_layer].cpu().detach() for h in output.hidden_states[1:]],
                     dim=1,
                 )
-        else:
-            input_tokens_hs = output.hidden_states[0].mean(axis=0).cpu().detach()
-            if len(output.hidden_states) > 1:
-                generated_tokens_hs = torch.cat(
-                    [
-                        h[hidden_layer].mean(axis=0).cpu().detach()
-                        for h in output.hidden_states[1:]
-                    ],
-                    dim=1,
-                )
-        if len(output.hidden_states) > 1:
-            if level == "sequence":
+            else:
+                generated_tokens_hs = None
+
+            if generated_tokens_hs is not None:
+                if level == "sequence":
+                    batch_embeddings_decoder = (
+                        torch.cat([input_tokens_hs, generated_tokens_hs], dim=1)
+                        .mean(dim=1)
+                        .cpu()
+                        .detach()
+                    )  # [batch, hidden_dim]
+                elif level == "token":
+                    batch_embeddings_decoder = (
+                        torch.cat(
+                            [input_tokens_hs[:, -1:], generated_tokens_hs], dim=1
+                        )
+                        .cpu()
+                        .detach()
+                    )  # [batch, seq_len, hidden_dim]
+                else:
+                    raise ValueError(f"Unknown level: {level}")
+            else:
                 batch_embeddings_decoder = (
-                    torch.cat([input_tokens_hs, generated_tokens_hs], dim=1)
-                    .mean(axis=1)
-                    .cpu()
-                    .detach()
-                )
-            elif level == "token":
-                batch_embeddings_decoder = (
-                    torch.cat([input_tokens_hs[:, -1:], generated_tokens_hs], dim=1)
-                    .cpu()
-                    .detach()
-                )
-        else:
-            batch_embeddings_decoder = input_tokens_hs.mean(axis=1).cpu().detach()
+                    input_tokens_hs.mean(dim=1).cpu().detach()
+                )  # [batch, hidden_dim]
 
         if hasattr(output, "vision_hidden_states"):
             vision_features = output.vision_hidden_states[-1].cpu().detach()

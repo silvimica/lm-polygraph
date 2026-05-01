@@ -84,6 +84,7 @@ def main(args):
         wandb.init(project=project, dir=save_path, config=wandb_cfg)
         wandb_save_directory(Path(save_path) / ".hydra")
     
+    
     save_path = args.save_path if "save_path" in args else save_path
     log.info(f"Main directory: {save_path}")
 
@@ -204,6 +205,8 @@ def get_stat_calculator_names(config):
     language = getattr(config, "language", "en")
     output_attentions = getattr(config, "output_attentions", True) and (getattr(config.model, "type", "Whitebox") != "vLLMCausalLM")
     output_hidden_states = False if getattr(config.model, "type", "Whitebox") == "vLLMCausalLM" else True
+    all_layers = True
+
     hf_cache = getattr(config, "hf_cache", None)
     deberta_batch_size = getattr(config, "deberta_batch_size", 10)
     blackbox_supports_logprobs = model_type == "Blackbox" and getattr(
@@ -220,11 +223,14 @@ def get_stat_calculator_names(config):
             output_hidden_states=output_hidden_states,
             blackbox_supports_logprobs=blackbox_supports_logprobs,
             deberta_batch_size=deberta_batch_size,
+            all_layers=True
         )
 
     for stat_calculator in config.stat_calculators:
         if stat_calculator == "auto":
             continue
+        print(stat_calculator)
+        print(stat_calculator.cfg)
         sc = StatCalculatorContainer(
             name=stat_calculator.name,
             cfg=stat_calculator.cfg,
